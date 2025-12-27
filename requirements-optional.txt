@@ -1,0 +1,11 @@
+# Optional Advanced Dependencies
+# These require C++ build tools on Windows
+
+# Model Explainability (OPTIONAL)
+# If you want SHAP, install manually:
+# pip install shap --no-build-isolation
+shap==0.44.0
+
+# Alternative: Use pre-built wheel
+# Download from: https://www.lfd.uci.edu/~gohlke/pythonlibs/
+# Then: pip install shap-0.44.0-cp312-cp312-win_amd64.whl
