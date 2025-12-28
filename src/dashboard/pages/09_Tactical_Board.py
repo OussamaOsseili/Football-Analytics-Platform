@@ -23,7 +23,7 @@ st.markdown("### Design your optimal XI and analyze squad balance")
 # -----------------------------------------------------------------------------
 
 @st.cache_data
-def load_match_data_with_names():
+def load_match_data_v2():
     try:
         match_df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         
@@ -141,7 +141,7 @@ def build_team_data(match_df):
 
 # Load Data
 with st.spinner("Loading tactical data..."):
-    match_data = load_match_data_with_names()
+    match_data = load_match_data_v2()
     data = build_team_data(match_data)
 
 if data.empty:

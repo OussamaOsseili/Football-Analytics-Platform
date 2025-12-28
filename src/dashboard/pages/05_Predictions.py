@@ -21,7 +21,7 @@ st.markdown("### AI-Powered Player Performance Forecasting")
 
 # ================= DATA LOADING (Robust Aggregation) =================
 @st.cache_data
-def load_match_data_with_names():
+def load_match_data_v2():
     try:
         df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         
@@ -159,7 +159,7 @@ def train_model(data, target_col, feature_cols):
     
     return model, r2, mae, feature_cols
 
-match_data = load_match_data_with_names()
+match_data = load_match_data_v2()
 season_data = build_robust_season_data(match_data)
 
 # Rename for compatibility with rest of script

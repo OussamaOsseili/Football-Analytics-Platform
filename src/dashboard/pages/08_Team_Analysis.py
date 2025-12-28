@@ -21,7 +21,7 @@ st.markdown("### Team chemistry, partnerships, and balance")
 
 # ================= DATA LOADING =================
 @st.cache_data
-def load_match_data_with_names():
+def load_match_data_v2():
     try:
         df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         team_mapping = {}
@@ -181,7 +181,7 @@ def build_team_data_with_styles(match_df):
     
     return season
 
-match_data = load_match_data_with_names()
+match_data = load_match_data_v2()
 full_data = build_team_data_with_styles(match_data)
 
 # Ensure we have data

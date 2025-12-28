@@ -22,35 +22,50 @@ if 'comparison_list' not in st.session_state:
 
 # ================= DATA LOADING (Copied from Player Profile) =================
 @st.cache_data
-def load_match_data_with_names():
+def load_match_data_v2():
     try:
         # Load player match stats
         df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         
-        # Build team, competition mappings from StatsBomb data
+        # Try loading pre-computed lookups first (Deployment Optimization)
+        lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
+        
         team_mapping = {}
-        comp_mapping = {}
         match_comp_mapping = {}
         
-        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
-        
-        # Iterate through competition folders
-        for comp_folder in data_path.iterdir():
-            if comp_folder.is_dir():
-                for season_file in comp_folder.glob("*.json"):
-                    try:
-                        with open(season_file, 'r', encoding='utf-8') as f:
-                            matches = json.load(f)
-                            for match in matches:
-                                team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
-                                team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
-                                comp_name = match['competition']['competition_name']
-                                season_name = match['season']['season_name']
-                                comp_full = f"{comp_name} - {season_name}"
-                                comp_mapping[match['competition']['competition_id']] = comp_full
-                                match_comp_mapping[match['match_id']] = comp_full
-                    except:
-                        continue
+        loaded_from_json = False
+        if lookup_file.exists():
+            try:
+                with open(lookup_file, 'r', encoding='utf-8') as f:
+                    lookups = json.load(f)
+                    def int_keys(d): return {int(k): v for k, v in d.items()}
+                    
+                    team_mapping = int_keys(lookups.get('team_mapping', {}))
+                    match_comp_mapping = int_keys(lookups.get('match_comp_mapping', {}))
+                    loaded_from_json = True
+            except Exception as e:
+                print(f"Error loading lookups: {e}")
+
+        if not loaded_from_json:
+            data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+            
+            # Iterate through competition folders
+            if data_path.exists():
+                for comp_folder in data_path.iterdir():
+                    if comp_folder.is_dir():
+                        for season_file in comp_folder.glob("*.json"):
+                            try:
+                                with open(season_file, 'r', encoding='utf-8') as f:
+                                    matches = json.load(f)
+                                    for match in matches:
+                                        team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
+                                        team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
+                                        comp_name = match['competition']['competition_name']
+                                        season_name = match['season']['season_name']
+                                        comp_full = f"{comp_name} - {season_name}"
+                                        match_comp_mapping[match['match_id']] = comp_full
+                            except:
+                                continue
         
         if 'team_id' in df.columns:
             df['team_name'] = df['team_id'].map(team_mapping)
@@ -62,25 +77,10 @@ def load_match_data_with_names():
     except FileNotFoundError:
         return pd.DataFrame()
 
-match_data = load_match_data_with_names()
+match_data = load_match_data_v2()
 
 if match_data.empty:
-    st.error("⚠️ Data not loaded. Directory Listing Debug:")
-    
-    debug_path = settings.PROCESSED_DATA_DIR
-    st.write(f"Target Path: `{debug_path}`")
-    
-    if debug_path.exists():
-        st.write("✅ Directory exists. Contents:")
-        files = [f.name for f in debug_path.iterdir()]
-        st.write(files)
-    else:
-        st.error(f"❌ Directory does not exist! Checking parent: `{debug_path.parent}`")
-        if debug_path.parent.exists():
-             st.write(f"Parent contents: {[f.name for f in debug_path.parent.iterdir()]}")
-        else:
-             st.error("❌ Parent does not exist either!")
-             
+    st.error("⚠️ Data still not loaded after cache clear. Please report this bug.")
     st.stop()
 
 # Definition of columns to sum (Global scope)
