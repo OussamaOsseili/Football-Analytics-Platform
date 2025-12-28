@@ -668,6 +668,7 @@ if selected_team != "All Teams" and len(data) > 0:
             
             if len(all_players) > 0:
                 suggestions = []
+                seen_players = set()
                 
                 for gap in gaps[:3]:  # Limit to top 3 gaps
                     gap_pos = gap['position']
@@ -700,16 +701,19 @@ if selected_team != "All Teams" and len(data) > 0:
                         top_candidates = candidates.nlargest(3, 'fit_score')
                         
                         for _, candidate in top_candidates.iterrows():
-                            suggestions.append({
-                                'gap_type': gap['type'],
-                                'position': gap_pos,
-                                'player': candidate['player_name'],
-                                'team': candidate.get('team_name', 'Unknown'),
-                                'style': candidate.get('primary_style', 'Unknown'),
-                                'fit_score': candidate['fit_score'],
-                                'off_score': candidate.get('offensive_score', 0),
-                                'def_score': candidate.get('defensive_score', 0)
-                            })
+                            p_name = candidate['player_name']
+                            if p_name not in seen_players:
+                                seen_players.add(p_name)
+                                suggestions.append({
+                                    'gap_type': gap['type'],
+                                    'position': gap_pos,
+                                    'player': p_name,
+                                    'team': candidate.get('team_name', 'Unknown'),
+                                    'style': candidate.get('primary_style', 'Unknown'),
+                                    'fit_score': candidate['fit_score'],
+                                    'off_score': candidate.get('offensive_score', 0),
+                                    'def_score': candidate.get('defensive_score', 0)
+                                })
                 
                 if suggestions:
                     # Sort by fit score
