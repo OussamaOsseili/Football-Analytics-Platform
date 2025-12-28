@@ -637,7 +637,7 @@ else:
 
 # Transfer Suggestions
 st.markdown("---")
-st.subheader("🔄 Transfer Suggestions")
+st.subheader("🔄 Transfer Suggestions (Fixed v3)")
 
 if selected_team != "All Teams" and len(data) > 0:
     # Identify squad gaps
