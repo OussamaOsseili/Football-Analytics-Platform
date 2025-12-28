@@ -65,9 +65,22 @@ def load_match_data_with_names():
 match_data = load_match_data_with_names()
 
 if match_data.empty:
-    st.error("⚠️ Data not loaded. This usually means 'players_match_stats.csv' is missing or corrupted.")
-    st.info(f"Debug: Project Root is {settings.PROJECT_ROOT}")
-    st.info(f"Debug: Looking for {settings.PROCESSED_DATA_DIR / 'players_match_stats.csv'}")
+    st.error("⚠️ Data not loaded. Directory Listing Debug:")
+    
+    debug_path = settings.PROCESSED_DATA_DIR
+    st.write(f"Target Path: `{debug_path}`")
+    
+    if debug_path.exists():
+        st.write("✅ Directory exists. Contents:")
+        files = [f.name for f in debug_path.iterdir()]
+        st.write(files)
+    else:
+        st.error(f"❌ Directory does not exist! Checking parent: `{debug_path.parent}`")
+        if debug_path.parent.exists():
+             st.write(f"Parent contents: {[f.name for f in debug_path.parent.iterdir()]}")
+        else:
+             st.error("❌ Parent does not exist either!")
+             
     st.stop()
 
 # Definition of columns to sum (Global scope)
