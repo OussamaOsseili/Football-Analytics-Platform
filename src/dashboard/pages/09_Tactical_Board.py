@@ -32,26 +32,49 @@ def load_match_data_with_names():
             import json
             team_mapping = {}
             comp_mapping = {}
-            data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
             
-            for comp_folder in data_path.iterdir():
-                if comp_folder.is_dir():
-                    for season_file in comp_folder.glob("*.json"):
-                        try:
-                            with open(season_file, 'r', encoding='utf-8') as f:
-                                matches = json.load(f)
-                                for match in matches:
-                                    if "Women's" in match['competition']['competition_name']: continue
-                                    match_id = match['match_id']
-                                    team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
-                                    team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
-                                    comp_mapping[match_id] = match['competition']['competition_name']
-                        except: continue
+            # Try loading pre-computed lookups first (Deployment Optimization)
+            lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
+            loaded_from_json = False
             
-            if 'team_name' not in match_df.columns:
-                match_df['team_name'] = match_df['team_id'].map(team_mapping)
-            if 'competition_name' not in match_df.columns:
-                match_df['competition_name'] = match_df['match_id'].map(comp_mapping)
+            if lookup_file.exists():
+                try:
+                    with open(lookup_file, 'r', encoding='utf-8') as f:
+                        lookups = json.load(f)
+                        def int_keys(d): return {int(k): v for k, v in d.items()}
+                        team_mapping = int_keys(lookups.get('team_mapping', {}))
+                        comp_mapping = int_keys(lookups.get('match_comp_mapping', {}))
+                        
+                        if 'team_name' not in match_df.columns:
+                            match_df['team_name'] = match_df['team_id'].map(team_mapping)
+                        if 'competition_name' not in match_df.columns:
+                            match_df['competition_name'] = match_df['match_id'].map(comp_mapping)
+                        
+                        loaded_from_json = True
+                except Exception as e:
+                    print(f"Error loading lookups: {e}")
+            
+            if not loaded_from_json:
+                data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+                if data_path.exists():
+                    for comp_folder in data_path.iterdir():
+                        if comp_folder.is_dir():
+                            for season_file in comp_folder.glob("*.json"):
+                                try:
+                                    with open(season_file, 'r', encoding='utf-8') as f:
+                                        matches = json.load(f)
+                                        for match in matches:
+                                            if "Women's" in match['competition']['competition_name']: continue
+                                            match_id = match['match_id']
+                                            team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
+                                            team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
+                                            comp_mapping[match_id] = match['competition']['competition_name']
+                                except: continue
+                
+                if 'team_name' not in match_df.columns:
+                    match_df['team_name'] = match_df['team_id'].map(team_mapping)
+                if 'competition_name' not in match_df.columns:
+                    match_df['competition_name'] = match_df['match_id'].map(comp_mapping)
                 
         return match_df
     except FileNotFoundError:

@@ -25,39 +25,54 @@ def load_match_data_with_names():
     try:
         df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         
+        # Uses processed CSVs primarily, but supplements with lookups
+        lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
+        
         team_mapping = {}
-        comp_mapping = {}
-        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+        comp_mapping = {} # Need to define this
         
-        for comp_folder in data_path.iterdir():
-            if comp_folder.is_dir():
-                for season_file in comp_folder.glob("*.json"):
-                    try:
-                        with open(season_file, 'r', encoding='utf-8') as f:
-                            matches = json.load(f)
-                            for match in matches:
-                                if "Women's" in match['competition']['competition_name']:
-                                    continue
-                                team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
-                                team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
-                                comp_full = f"{match['competition']['competition_name']} - {match['season']['season_name']}"
-                                if 'match_id' in df.columns:
-                                     # This mapping approach is a bit indirect, but we map comp ID to name
-                                     pass 
-                                # Better: Mapping logic needs to match Player Profile. 
-                                # Since we can't easily map match_id -> comp directly without huge dict, 
-                                # let's rely on what we have or a simplified version.
-                                # Actually, for predictions, we just need the aggregated stats.
-                                # The hierarchy search needs the names.
-                    except:
-                        continue
+        loaded_from_json = False
+        if lookup_file.exists():
+            try:
+                with open(lookup_file, 'r', encoding='utf-8') as f:
+                    lookups = json.load(f)
+                    def int_keys(d): return {int(k): v for k, v in d.items()}
+                    
+                    team_mapping = int_keys(lookups.get('team_mapping', {}))
+                    # Note: match_lookups has match_comp_mapping (match_id -> comp_name)
+                    # We might not check match_id column here if we only read `players_match_stats.csv` which has it.
+                    # Yes, match_df needs match_id to map comp_name.
+                    
+                    loaded_from_json = True
+            except Exception as e:
+                print(f"Error loading lookups: {str(e)}")
         
-        # Simplified for prediction page: Just ensure we have team names if possible
+        if not loaded_from_json:
+             data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+             if data_path.exists():
+                for comp_folder in data_path.iterdir():
+                    if comp_folder.is_dir():
+                        for season_file in comp_folder.glob("*.json"):
+                            try:
+                                with open(season_file, 'r', encoding='utf-8') as f:
+                                    matches = json.load(f)
+                                    for match in matches:
+                                        if "Women's" in match['competition']['competition_name']:
+                                            continue
+                                        team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
+                                        team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
+                            except:
+                                continue
+        
+        # Simplified for prediction page
         if 'team_name' not in df.columns and 'team_id' in df.columns and team_mapping:
              df['team_name'] = df['team_id'].map(team_mapping)
              
-        # Create a simple competition name if missing (or load from json if crucial)
-        # For now, we will proceed with what's in CSV or basic mapping
+        # Create a simple competition name if missing
+        # If we have match_comp_mapping from lookup logic above (I defined it but didn't assign if json loaded),
+        # we could use it.
+        # But honestly, for predictions, `team_name` is the most critical visual. `comp_name` is secondary.
+        # Let's trust the mapped team name.
         return df
     except FileNotFoundError:
         return pd.DataFrame()

@@ -25,35 +25,63 @@ def load_match_data_with_names():
     try:
         df = pd.read_csv(settings.PROCESSED_DATA_DIR / "players_match_stats.csv")
         team_mapping = {}
-        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+        # Try loading pre-computed lookups first (Deployment Optimization)
+        lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
         
-        # Ensure team names and competition names
-        if 'team_name' not in df.columns or 'competition_name' not in df.columns:
-             comp_mapping = {}
-             for comp_folder in data_path.iterdir():
-                if comp_folder.is_dir():
-                    for season_file in comp_folder.glob("*.json"):
-                        try:
-                            with open(season_file, 'r', encoding='utf-8') as f:
-                                matches = json.load(f)
-                                for match in matches:
-                                    # Filter Women's competitions (Safety check)
-                                    if "Women's" in match['competition']['competition_name']:
-                                        continue
-                                        
-                                    match_id = match['match_id']
-                                    team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
-                                    team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
-                                    
-                                    # Map match to competition
-                                    comp_mapping[match_id] = match['competition']['competition_name']
-                        except: continue
-             
-             if 'team_name' not in df.columns:
-                 df['team_name'] = df['team_id'].map(team_mapping)
-             
-             if 'competition_name' not in df.columns:
-                 df['competition_name'] = df['match_id'].map(comp_mapping)
+        loaded_from_json = False
+        if lookup_file.exists():
+            try:
+                with open(lookup_file, 'r', encoding='utf-8') as f:
+                    lookups = json.load(f)
+                    def int_keys(d): return {int(k): v for k, v in d.items()}
+                    
+                    team_mapping = int_keys(lookups.get('team_mapping', {}))
+                    # comp_mapping works on match_id in the original code, but here we mapped match_id -> comp_name in lookups
+                    # origin: comp_mapping[match_id] = comp_name
+                    # JSON: match_comp_mapping[match_id] = comp_name
+                    match_comp_mapping = int_keys(lookups.get('match_comp_mapping', {}))
+                    
+                    if 'team_name' not in df.columns and 'team_id' in df.columns:
+                        df['team_name'] = df['team_id'].map(team_mapping)
+                    
+                    if 'competition_name' not in df.columns and 'match_id' in df.columns:
+                        df['competition_name'] = df['match_id'].map(match_comp_mapping)
+                        
+                    loaded_from_json = True
+            except Exception as e:
+                print(f"Error loading lookups: {e}")
+
+        if not loaded_from_json:
+            data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+            
+            # Ensure team names and competition names
+            if 'team_name' not in df.columns or 'competition_name' not in df.columns:
+                 comp_mapping = {}
+                 if data_path.exists():
+                     for comp_folder in data_path.iterdir():
+                        if comp_folder.is_dir():
+                            for season_file in comp_folder.glob("*.json"):
+                                try:
+                                    with open(season_file, 'r', encoding='utf-8') as f:
+                                        matches = json.load(f)
+                                        for match in matches:
+                                            # Filter Women's competitions (Safety check)
+                                            if "Women's" in match['competition']['competition_name']:
+                                                continue
+                                                
+                                            match_id = match['match_id']
+                                            team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
+                                            team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
+                                            
+                                            # Map match to competition
+                                            comp_mapping[match_id] = match['competition']['competition_name']
+                                except: continue
+                 
+                 if 'team_name' not in df.columns:
+                     df['team_name'] = df['team_id'].map(team_mapping)
+                 
+                 if 'competition_name' not in df.columns:
+                     df['competition_name'] = df['match_id'].map(comp_mapping)
 
         return df
     except FileNotFoundError:
@@ -252,41 +280,88 @@ if selected_team != "All Teams":
         from pathlib import Path
         
         # Load match results from JSON files
-        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
-        team_matches = []
+        # Load match results from lookups (Cloud optimized)
+        lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
         
-        for comp_folder in data_path.iterdir():
-            if comp_folder.is_dir():
-                for season_file in comp_folder.glob("*.json"):
-                    try:
-                        with open(season_file, 'r', encoding='utf-8') as f:
-                            matches = json.load(f)
-                            for match in matches:
-                                if "Women's" in match['competition']['competition_name']:
-                                    continue
-                                
-                                # Filter old matches (exclude 2015-2019)
-                                match_date = match.get('match_date', '')
-                                if match_date < '2020-01-01':
-                                    continue
-                                
-                                home_team = match['home_team']['home_team_name']
-                                away_team = match['away_team']['away_team_name']
-                                
-                                if selected_team in home_team:
-                                    team_matches.append({
-                                        'date': match_date,
-                                        'goals_for': match['home_score'],
-                                        'goals_against': match['away_score']
-                                    })
-                                elif selected_team in away_team:
-                                    team_matches.append({
-                                        'date': match.get('match_date', ''),
-                                        'goals_for': match['away_score'],
-                                        'goals_against': match['home_score']
-                                    })
-                    except:
-                        continue
+        team_matches = []
+        loaded_matches = False
+        
+        if lookup_file.exists():
+            try:
+                with open(lookup_file, 'r', encoding='utf-8') as f:
+                    lookups = json.load(f)
+                    
+                    # Maps (String keys)
+                    home_map = lookups.get('match_home_team_map', {})
+                    away_map = lookups.get('match_away_team_map', {})
+                    home_score_map = lookups.get('match_home_score_map', {})
+                    away_score_map = lookups.get('match_away_score_map', {})
+                    date_map = lookups.get('match_date_map', {})
+                    team_map = lookups.get('team_mapping', {}) # ID -> Name
+                    
+                    # Iterate all matches in lookup
+                    for mid_str in home_map.keys():
+                        m_date = date_map.get(mid_str, '')
+                        if m_date < '2020-01-01': continue
+                        
+                        htid_str = str(home_map[mid_str])
+                        atid_str = str(away_map[mid_str])
+                        
+                        h_name = team_map.get(htid_str, "Unknown")
+                        a_name = team_map.get(atid_str, "Unknown")
+                        
+                        # Check if selected team participated (partial match for safety)
+                        if selected_team in h_name:
+                             team_matches.append({
+                                'date': m_date,
+                                'goals_for': home_score_map.get(mid_str, 0),
+                                'goals_against': away_score_map.get(mid_str, 0)
+                            })
+                        elif selected_team in a_name:
+                             team_matches.append({
+                                'date': m_date,
+                                'goals_for': away_score_map.get(mid_str, 0),
+                                'goals_against': home_score_map.get(mid_str, 0)
+                            })
+                    loaded_matches = True
+            except Exception as e:
+                print(f"Error loading score lookups: {str(e)}")
+        
+        if not loaded_matches:
+            data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+            if data_path.exists():
+                for comp_folder in data_path.iterdir():
+                    if comp_folder.is_dir():
+                        for season_file in comp_folder.glob("*.json"):
+                            try:
+                                with open(season_file, 'r', encoding='utf-8') as f:
+                                    matches = json.load(f)
+                                    for match in matches:
+                                        if "Women's" in match['competition']['competition_name']:
+                                            continue
+                                        
+                                        # Filter old matches (exclude 2015-2019)
+                                        match_date = match.get('match_date', '')
+                                        if match_date < '2020-01-01':
+                                            continue
+                                        
+                                        home_team = match['home_team']['home_team_name']
+                                        away_team = match['away_team']['away_team_name']
+                                        
+                                        if selected_team in home_team:
+                                            team_matches.append({
+                                                'date': match_date,
+                                                'goals_for': match['home_score'],
+                                                'goals_against': match['away_score']
+                                            })
+                                        elif selected_team in away_team:
+                                            team_matches.append({
+                                                'date': match.get('match_date', ''),
+                                                'goals_for': match['away_score'],
+                                                'goals_against': match['home_score']
+                                            })
+                            except:
+                                continue
         
         if team_matches:
             # Convert to DataFrame and sort by date

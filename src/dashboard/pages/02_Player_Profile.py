@@ -54,33 +54,56 @@ def _load_match_data_internal():
     match_home_team_map = {} # match_id -> home_team_id
     match_date_map = {} # match_id -> match_date
     
-    data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+    # Try loading pre-computed lookups first (Deployment Optimization)
+    lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
     
-    for comp_folder in data_path.iterdir():
-        if comp_folder.is_dir():
-            for season_file in comp_folder.glob("*.json"):
-                try:
-                    with open(season_file, 'r', encoding='utf-8') as f:
-                        matches = json.load(f)
-                        for match in matches:
-                            mid = match['match_id']
-                            htid = match['home_team']['home_team_id']
-                            atid = match['away_team']['away_team_id']
-                            mdate = match['match_date']
-                            comp_name = match['competition']['competition_name']
-                            
-                            # Filter out Women's competitions as requested
-                            if "Women's" in comp_name:
-                                continue
-                            
-                            team_mapping[htid] = match['home_team']['home_team_name']
-                            team_mapping[atid] = match['away_team']['away_team_name']
-                            
-                            comp_full = f"{comp_name} - {match['season']['season_name']}"
-                            match_comp_mapping[mid] = comp_full
-                            match_home_team_map[mid] = htid
-                            match_date_map[mid] = mdate
-                except: continue
+    loaded_from_json = False
+    if lookup_file.exists():
+        try:
+            with open(lookup_file, 'r', encoding='utf-8') as f:
+                lookups = json.load(f)
+                # Helper to convert keys back to int (JSON stores keys as strings)
+                def int_keys(d):
+                    return {int(k): v for k, v in d.items()}
+                    
+                team_mapping = int_keys(lookups.get('team_mapping', {}))
+                match_comp_mapping = int_keys(lookups.get('match_comp_mapping', {}))
+                match_home_team_map = int_keys(lookups.get('match_home_team_map', {}))
+                match_date_map = int_keys(lookups.get('match_date_map', {}))
+                loaded_from_json = True
+        except Exception as e:
+            print(f"Error loading lookups: {e}")
+
+    if not loaded_from_json:
+        # Fallback to local raw data
+        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+        
+        if data_path.exists():
+            for comp_folder in data_path.iterdir():
+                if comp_folder.is_dir():
+                    for season_file in comp_folder.glob("*.json"):
+                        try:
+                            with open(season_file, 'r', encoding='utf-8') as f:
+                                matches = json.load(f)
+                                for match in matches:
+                                    mid = match['match_id']
+                                    htid = match['home_team']['home_team_id']
+                                    atid = match['away_team']['away_team_id']
+                                    mdate = match['match_date']
+                                    comp_name = match['competition']['competition_name']
+                                    
+                                    # Filter out Women's competitions as requested
+                                    if "Women's" in comp_name:
+                                        continue
+                                    
+                                    team_mapping[htid] = match['home_team']['home_team_name']
+                                    team_mapping[atid] = match['away_team']['away_team_name']
+                                    
+                                    comp_full = f"{comp_name} - {match['season']['season_name']}"
+                                    match_comp_mapping[mid] = comp_full
+                                    match_home_team_map[mid] = htid
+                                    match_date_map[mid] = mdate
+                        except: continue
 
     if 'team_id' in df.columns:
         df['team_name'] = df['team_id'].map(team_mapping)

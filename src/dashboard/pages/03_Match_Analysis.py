@@ -30,35 +30,74 @@ def load_match_data():
         match_comp_mapping = {}  # match_id -> competition_name
         match_name_mapping = {}  # match_id -> "Home vs Away - Competition - Date"
         
-        data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+        # Try loading pre-computed lookups first (Deployment Optimization)
+        lookup_file = settings.PROCESSED_DATA_DIR / "match_lookups.json"
         
-        # Iterate through competition folders
-        for comp_folder in data_path.iterdir():
-            if comp_folder.is_dir():
-                for season_file in comp_folder.glob("*.json"):
-                    try:
-                        with open(season_file, 'r', encoding='utf-8') as f:
-                            matches = json.load(f)
-                            for match in matches:
-                                # Team mapping
-                                team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
-                                team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
-                                
-                                # Competition mapping
-                                comp_name = match['competition']['competition_name']
-                                season_name = match['season']['season_name']
-                                comp_full = f"{comp_name} - {season_name}"
-                                comp_mapping[match['competition']['competition_id']] = comp_full
-                                match_comp_mapping[match['match_id']] = comp_full
-                                
-                                # Match name: "Home vs Away - Competition - Date"
-                                home_team = match['home_team']['home_team_name']
-                                away_team = match['away_team']['away_team_name']
-                                match_date = match['match_date']
-                                match_name = f"{home_team} vs {away_team} - {comp_name} - {match_date}"
-                                match_name_mapping[match['match_id']] = match_name
-                    except:
-                        continue
+        loaded_from_json = False
+        if lookup_file.exists():
+            try:
+                with open(lookup_file, 'r', encoding='utf-8') as f:
+                    lookups = json.load(f)
+                    
+                    def int_keys(d): return {int(k): v for k, v in d.items()}
+                    
+                    team_mapping = int_keys(lookups.get('team_mapping', {}))
+                    match_comp_mapping = int_keys(lookups.get('match_comp_mapping', {}))
+                    
+                    # Auxiliary maps for name reconstruction
+                    match_home_team_map = int_keys(lookups.get('match_home_team_map', {}))
+                    match_away_team_map = int_keys(lookups.get('match_away_team_map', {}))
+                    match_date_map = int_keys(lookups.get('match_date_map', {}))
+                    
+                    # Reconstruct match_name_mapping
+                    for mid, htid in match_home_team_map.items():
+                        atid = match_away_team_map.get(mid)
+                        home_name = team_mapping.get(htid, "Unknown Team")
+                        away_name = team_mapping.get(atid, "Unknown Team")
+                        comp_full = match_comp_mapping.get(mid, "Unknown Comp")
+                        # Extract comp name roughly if needed, or use full string
+                        # Original: "Home vs Away - Comp Name - Date"
+                        # Here: "Home vs Away - Comp Name - Season - Date" (acceptable)
+                        mdate = match_date_map.get(mid, "Unknown Date")
+                        
+                        match_name = f"{home_name} vs {away_name} - {comp_full} - {mdate}"
+                        match_name_mapping[mid] = match_name
+                        
+                    loaded_from_json = True
+            except Exception as e:
+                print(f"Error loading lookups: {e}")
+
+        if not loaded_from_json:
+            data_path = settings.PROJECT_ROOT / "dataset 3" / "data" / "matches"
+            
+            # Iterate through competition folders
+            if data_path.exists():
+                for comp_folder in data_path.iterdir():
+                    if comp_folder.is_dir():
+                        for season_file in comp_folder.glob("*.json"):
+                            try:
+                                with open(season_file, 'r', encoding='utf-8') as f:
+                                    matches = json.load(f)
+                                    for match in matches:
+                                        # Team mapping
+                                        team_mapping[match['home_team']['home_team_id']] = match['home_team']['home_team_name']
+                                        team_mapping[match['away_team']['away_team_id']] = match['away_team']['away_team_name']
+                                        
+                                        # Competition mapping
+                                        comp_name = match['competition']['competition_name']
+                                        season_name = match['season']['season_name']
+                                        comp_full = f"{comp_name} - {season_name}"
+                                        comp_mapping[match['competition']['competition_id']] = comp_full
+                                        match_comp_mapping[match['match_id']] = comp_full
+                                        
+                                        # Match name: "Home vs Away - Competition - Date"
+                                        home_team = match['home_team']['home_team_name']
+                                        away_team = match['away_team']['away_team_name']
+                                        match_date = match['match_date']
+                                        match_name = f"{home_team} vs {away_team} - {comp_name} - {match_date}"
+                                        match_name_mapping[match['match_id']] = match_name
+                            except:
+                                continue
         
         # Add team names, competitions, and match names to dataframe
         if 'team_id' in df.columns:
