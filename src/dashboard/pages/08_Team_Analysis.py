@@ -701,7 +701,7 @@ if selected_team != "All Teams" and len(data) > 0:
                         top_candidates = candidates.nlargest(3, 'fit_score')
                         
                         for _, candidate in top_candidates.iterrows():
-                            p_name = candidate['player_name']
+                            p_name = str(candidate['player_name']).strip()
                             if p_name not in seen_players:
                                 seen_players.add(p_name)
                                 suggestions.append({
