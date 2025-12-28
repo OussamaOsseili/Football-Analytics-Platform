@@ -9,7 +9,7 @@ A comprehensive data science platform for football analytics using StatsBomb Ope
 ## 🎯 Key Features
 
 ### 📊 **Data & Analytics**
-- ✅ **700-900 matches** from 8 elite competitions (FIFA World Cup 2022, Ligue 1, Bundesliga, UEFA Euro 2024, etc.)
+- ✅ **700-900 matches** from 5 elite competitions (FIFA World Cup 2022, Ligue 1, Bundesliga, UEFA Euro 2024, etc.)
 - ✅ **360° tracking data** for advanced physical metrics
 - ✅ **Multi-dimensional scoring** across 5 performance categories
 - ✅ **Per-90 minute normalization** for fair comparisons
@@ -49,14 +49,6 @@ A comprehensive data science platform for football analytics using StatsBomb Ope
 ### Installation
 
 ```bash
-# Clone repository
-cd "C:\Users\ossei\Downloads\PFA PROJECT"
-
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -73,7 +65,7 @@ python src/etl/etl_pipeline.py
 ```
 
 This will:
-- Load 8 selected competitions (2022-2024)
+- Load 5 selected competitions (2022-2024)
 - Process  ~700-900 matches
 - Calculate player statistics
 - Export CSVs to `data/processed/`
@@ -157,8 +149,8 @@ Code: MIT License
 
 ## 👥 Author
 
-Ossein - PFA Data Science Project 2024-2025
-
+Osseili Oussama - https://www.linkedin.com/in/oussama-osseili/
+Rochdi Othmane - https://www.linkedin.com/in/othmane-rochdi-b2874628a/
 ---
 
 ## 🙏 Acknowledgments
