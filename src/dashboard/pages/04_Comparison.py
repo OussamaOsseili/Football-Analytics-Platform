@@ -64,6 +64,12 @@ def load_match_data_with_names():
 
 match_data = load_match_data_with_names()
 
+if match_data.empty:
+    st.error("⚠️ Data not loaded. This usually means 'players_match_stats.csv' is missing or corrupted.")
+    st.info(f"Debug: Project Root is {settings.PROJECT_ROOT}")
+    st.info(f"Debug: Looking for {settings.PROCESSED_DATA_DIR / 'players_match_stats.csv'}")
+    st.stop()
+
 # Definition of columns to sum (Global scope)
 COLS_TO_SUM = [
     'goals', 'assists', 'xg', 'xa', 'shots', 'key_passes',
